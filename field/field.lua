@@ -4,6 +4,7 @@ local cell = require("field.cell")
 ---@field private _height integer
 ---@field private _width integer
 ---@field private _grid cell[][]
+---@field private _grid_help integer[]
 local field = {}
 field.__index = field
 
@@ -13,12 +14,11 @@ field.__index = field
 ---@param population integer spawn rate of bots in %
 ---@return field
 ---@nodiscard
-function field.new(height --[[@as integer]],
-                   width --[[@as integer]],
-                   population --[[@as integer]])
+function field.new(height,
+                   width,
+                   population)
     assert(height > 0)
     assert(width > 0)
-    population = population >= 0 and population or 0
 
     ---@type cell[][]
     local grid = {}
@@ -28,21 +28,51 @@ function field.new(height --[[@as integer]],
         local row = {}
 
         for j = 1, width do
-            if population > 0 then
-                row[j] = cell.new(population > math.random(100))
-            else
+            if population <= 0 then
                 row[j] = cell.new(false)
+            else
+                row[j] = cell.new(population >= math.random(100))
             end
         end
 
         grid[i] = row
-
     end
 
     ---@type field
     local self = setmetatable({
             _height = height,
             _width = width,
+            _grid = grid
+        },
+        field)
+
+    return self
+end
+
+---@public
+---@param other field
+---@return field
+---@nodiscard
+function field.new_cp(other) --research if other is not a copy alr..
+    ---@type cell[][]
+    local grid = {}
+
+    for i = 1, other._height do
+        ---@type cell[]
+        local row = {}
+
+        for j = 1, other._width do
+            row[j] = cell.new(false)
+            row[j]._energy = other._grid[i][j]:get_energy()
+        end
+
+        grid[i] = row
+    end
+
+    ---@type field
+    local self = setmetatable({
+            _height = other._height,
+            _width = other._width,
             _grid = grid
         },
         field)
@@ -76,12 +106,14 @@ function field:count_bots_rate()
 end
 
 ---@public
----@operator eq(field):boolean
 ---@param other field
 ---@return boolean
 ---@nodiscard
-function field:__eq(other --[[@as field]])
-    if self._height ~= other._height or self._width ~= other._width then return false end
+function field:__eq(other)
+    if self._height ~= other._height or self._width ~= other._width then
+        return false
+    end
+
     for i = 1, self._height do
         for j = 1, self._width do
             if self._grid[i][j] ~= other._grid[i][j] then
@@ -92,34 +124,40 @@ function field:__eq(other --[[@as field]])
     return true
 end
 
+---@private
+---@return nil
+function field:update_energy()
+    for i = 1, self._height do
+        for j = 1, self._width do
+            self._grid[i][j]:add_energy(math.random(2))
+        end
+    end
+end
+
+
 ---@public
 ---@return nil
 function field:get_iteration()
+    self:update_energy()
+
     ---@type field
-    local result = field.new(self._height, self._width, 0)
+    local result = field.new_cp(self)
+    assert(result:count_bots() == 0)
+
     for i = 2, self._height - 1 do
         for j = 2, self._width - 1 do
-
             ---@type integer[]
-            local direction_info = {
-                self._grid[i - 1][j - 1]:has_bot() and 0 or 1,
-                self._grid[i - 1][j    ]:has_bot() and 0 or 1,
-                self._grid[i - 1][j + 1]:has_bot() and 0 or 1,
-                self._grid[i    ][j - 1]:has_bot() and 0 or 1,
-                self._grid[i    ][j    ]:has_bot() and 0 or 1,
-                self._grid[i    ][j + 1]:has_bot() and 0 or 1,
-                self._grid[i + 1][j - 1]:has_bot() and 0 or 1,
-                self._grid[i + 1][j    ]:has_bot() and 0 or 1,
-                self._grid[i + 1][j + 1]:has_bot() and 0 or 1,
-            }
-
             if self._grid[i][j]:has_bot() then
                 ---@type integer, integer
-                local new_x, new_y = self._grid[i][j]:get_direction(direction_info)
-            result._grid[i + new_x][j + new_y] = self._grid[i][j]
+                local dir_y, dir_x = self._grid[i][j]
+                    :get_bot_pov()
+                assert(dir_x)
+                assert(dir_y)
+                result._grid[dir_y + i][dir_x + j] = self._grid[i][j]
             end
         end
     end
+
     assert(result._grid ~= nil)
     self._grid = result._grid
 end

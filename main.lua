@@ -1,18 +1,20 @@
 local field = require("field.field")
 
+math.randomseed(os.clock())
+
 ---@type integer
 local size_step = 100
 
-for i = 1, 10 do
+---@type integer
+local epochs = 1000
+
+for i = 1, 1 do
 
     ---@type field
     local a = field.new(i * size_step, i * size_step, 50)
 
     ---@type integer
     local start_time_2 = os.clock()
-
-    ---@type integer
-    local epochs = 10
 
     for _ = 1, epochs do
 
