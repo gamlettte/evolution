@@ -25,6 +25,6 @@ for i = 1, 1 do
     ---@type integer
     local end_time_2 = os.clock()
 
-    print("size " .. i * size_step .. " = "
-          .. (end_time_2 - start_time_2) / epochs)
+    print("size " .. i * size_step .. " = " ..
+              (end_time_2 - start_time_2) / epochs)
 end

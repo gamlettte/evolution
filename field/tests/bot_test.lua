@@ -27,7 +27,7 @@ tr:add_test_case("get_direction", function ()
         table.insert(input, i)
     end
 
-    local y, x = bot_a:get_direction(input)
+    local y, x = bot_a:get_action(input)
     assert(y <= 1 and y >= -1)
     assert(x <= 1 and x >= -1)
 end)

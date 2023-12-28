@@ -1,4 +1,6 @@
 local cell = require("field.cell")
+local bot = require("field.bot")
+local bot_actions = require("field.bot_actions")
 
 ---@class field
 ---@field private _height integer
@@ -14,9 +16,7 @@ field.__index = field
 ---@param population integer spawn rate of bots in %
 ---@return field
 ---@nodiscard
-function field.new(height,
-                   width,
-                   population)
+function field.new(height, width, population)
     assert(height > 0)
     assert(width > 0)
 
@@ -31,7 +31,7 @@ function field.new(height,
             if population <= 0 then
                 row[j] = cell.new(false)
             else
-                row[j] = cell.new(population >= math.random(100))
+                row[j] = cell.new(population >= math.random(1000))
             end
         end
 
@@ -40,20 +40,20 @@ function field.new(height,
 
     ---@type field
     local self = setmetatable({
-            _height = height,
-            _width = width,
-            _grid = grid
-        },
-        field)
+        _height = height,
+        _width = width,
+        _grid = grid
+    }, field)
 
     return self
 end
+
 
 ---@public
 ---@param other field
 ---@return field
 ---@nodiscard
-function field.new_cp(other) --research if other is not a copy alr..
+function field.new_default(other) -- research if other is not a copy alr..
     ---@type cell[][]
     local grid = {}
 
@@ -63,7 +63,7 @@ function field.new_cp(other) --research if other is not a copy alr..
 
         for j = 1, other._width do
             row[j] = cell.new(false)
-            row[j]._energy = other._grid[i][j]:get_energy()
+            row[j]._energy = 0
         end
 
         grid[i] = row
@@ -71,14 +71,14 @@ function field.new_cp(other) --research if other is not a copy alr..
 
     ---@type field
     local self = setmetatable({
-            _height = other._height,
-            _width = other._width,
-            _grid = grid
-        },
-        field)
+        _height = other._height,
+        _width = other._width,
+        _grid = grid
+    }, field)
 
     return self
 end
+
 
 ---@public
 ---@return integer
@@ -98,12 +98,14 @@ function field:count_bots()
     return bot_counter
 end
 
+
 ---@public
 ---@return integer
 ---@nodiscard
 function field:count_bots_rate()
     return self:count_bots() / (self._height * self._width)
 end
+
 
 ---@public
 ---@param other field
@@ -124,12 +126,15 @@ function field:__eq(other)
     return true
 end
 
+
 ---@private
 ---@return nil
 function field:update_energy()
     for i = 1, self._height do
         for j = 1, self._width do
-            self._grid[i][j]:add_energy(math.random(2))
+            if self._grid[i][j]:get_energy() < 50 then
+                self._grid[i][j]:add_energy(14)
+            end
         end
     end
 end
@@ -141,25 +146,105 @@ function field:get_iteration()
     self:update_energy()
 
     ---@type field
-    local result = field.new_cp(self)
-    assert(result:count_bots() == 0)
+    local result = field.new_default(self) -- copy energy in the end
+
+    ---@type integer
+    local move_count = 0
+
+    ---@type integer
+    local consume_energy_count = 0
+
+    ---@type integer
+    local consume_bot_count = 0
+
+    ---@type integer
+    local multiply_count = 0
 
     for i = 2, self._height - 1 do
         for j = 2, self._width - 1 do
             ---@type integer[]
             if self._grid[i][j]:has_bot() then
+                ---@type cell
+                local current_cell = self._grid[i][j]
+
                 ---@type integer, integer
-                local dir_y, dir_x = self._grid[i][j]
-                    :get_bot_pov()
-                assert(dir_x)
-                assert(dir_y)
-                result._grid[dir_y + i][dir_x + j] = self._grid[i][j]
+                local dir_y, dir_x = current_cell:get_bot_pov()
+
+                assert(dir_x <= 1 and dir_x >= -1)
+                assert(dir_y <= 1 and dir_y >= -1)
+                assert(dir_y + i <= self._height)
+
+                assert(self._grid[i])
+                assert(self._grid[i + dir_y],
+                       "i=" .. i .. " dy=" .. dir_y)
+                ---@type cell
+                local observed_cell = self._grid[i + dir_y][j + dir_x]
+
+                ---@type BOT_ACTION
+                local bot_action = current_cell:get_action(
+                                       observed_cell)
+
+                if bot_action == bot_actions.ACTION.MOVE then
+                    result._grid[dir_y + i][dir_x + j] = current_cell
+                    current_cell:kill_bot()
+                    move_count = move_count + 1
+
+                elseif bot_action == bot_actions.ACTION.CONSUME_ENERGY then
+                    current_cell:feed_bot()
+                    consume_energy_count = consume_energy_count + 1
+
+                elseif bot_action == bot_actions.ACTION.CONSUME_BOT then
+                    current_cell:feed_bot(observed_cell:kill_bot())
+                    consume_bot_count = consume_bot_count + 1
+
+                elseif bot_action == bot_actions.ACTION.MULTIPLY then
+                    if current_cell:get_bot_energy() <= 10 then
+                        current_cell:kill_bot()
+                    else
+                        result._grid[i + math.random(-1, 1)][j +
+                            math.random(-1, 1)]:accept_bot(
+                            current_cell:get_child())
+                        multiply_count = multiply_count + 1
+                    end
+                end
+                result._grid[i][j] = current_cell
             end
         end
     end
+    -- print("move "..move_count.." CE "..consume_energy_count.." CB "
+    -- ..consume_bot_count.." multiply "..multiply_count)
 
-    assert(result._grid ~= nil)
+    for i = 2, self._height - 1 do
+        for j = 2, self._width - 1 do
+            result._grid[i][j]._energy = self._grid[i][j]._energy
+        end
+    end
+
+    assert(result._grid[1] ~= nil)
     self._grid = result._grid
 end
+
+
+---@public
+---@return string[]
+---@nodiscard
+function field:to_print()
+    ---@type string[]
+    local result = {}
+
+    for _, value in ipairs(self._grid) do
+        local res_row = ""
+        for _, box in ipairs(value) do
+            if box:has_bot() then
+                res_row = res_row .. "@"
+            else
+                res_row = res_row .. " "
+            end
+        end
+        result[#result + 1] = res_row
+    end
+    return result
+end
+
 
 return field

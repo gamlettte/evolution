@@ -1,39 +1,44 @@
 local field = require("field.field")
+local curses = require("curses")
 
 math.randomseed(os.clock())
 
 ---@type integer
-local size = 200
+local size = 115
 
 ---@type integer
 local y_size = size
 
 ---@type integer
-local x_size = size
+local x_size = 475
 
----@type integer
-local bot_decrease_verifier = y_size * x_size
+local stdscr = curses.initscr()
+stdscr:clear()
+
+-- while true do
 
 ---@type field
-local a = field.new(y_size, x_size, 1)
+local a = field.new(y_size, x_size, 500)
 
-for _ = 1, 100 do
-
+while true do
     ---@type integer
     local start_time_2 = os.clock()
 
     a:get_iteration()
 
+    local grid = a:to_print()
+    stdscr:clear()
+    for i = 1, y_size do stdscr:mvaddstr(i, 0, grid[i]) end
+    stdscr:refresh()
+
     ---@type integer
     local bot_count = a:count_bots()
-
-    assert(bot_count <= bot_decrease_verifier)
-    bot_decrease_verifier = bot_count
-    print("rate = ", bot_count)
+    if bot_count == 0 then
+        break
+    end
 
     ---@type integer
     local end_time_2 = os.clock()
-
-    print("size " .. size .. " = "
-          .. (end_time_2 - start_time_2))
+    -- print("bc = "..bot_count)
 end
+-- end
