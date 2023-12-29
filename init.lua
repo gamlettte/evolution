@@ -12,13 +12,14 @@ local y_size = size
 ---@type integer
 local x_size = 475
 
+::continue::
 local stdscr = curses.initscr()
 stdscr:clear()
 
 -- while true do
 
 ---@type field
-local a = field.new(y_size, x_size, 500)
+local a = field.new(y_size, x_size, 900)
 
 while true do
     ---@type integer
@@ -28,13 +29,15 @@ while true do
 
     local grid = a:to_print()
     stdscr:clear()
-    for i = 1, y_size do stdscr:mvaddstr(i, 0, grid[i]) end
+    for i = 1, y_size do
+        stdscr:mvaddstr(i, 0, grid[i])
+    end
     stdscr:refresh()
 
     ---@type integer
     local bot_count = a:count_bots()
     if bot_count == 0 then
-        break
+        goto continue
     end
 
     ---@type integer

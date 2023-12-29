@@ -6,14 +6,19 @@ local bot_actions = require("field.bot_actions")
 ---@field private _direction_y integer
 ---@field private _energy integer
 ---@field private _genes integer[]
+---@field private _life_counter integer
 local bot = {}
 bot.__index = bot
 
 ---@type integer
-local WEIGHT_DEVIATION = 6
+local WEIGHT_DEVIATION = 10
 
 ---@type integer
 local BRAIN_MUTATION_PROB = 10
+
+
+---@type integer
+local MAX_AGE = 40
 
 ---@public
 ---@return bot
@@ -26,7 +31,8 @@ function bot:get_child()
         _weight_layer_1 = self._weight_layer_1,
         _weight_layer_2 = self._weight_layer_2,
         _energy = math.random(5) + 5,
-        _genes = self._genes
+        _genes = self._genes,
+        _life_counter = 0
     }, bot)
 
     -- gene mutation
@@ -39,15 +45,13 @@ function bot:get_child()
     -- brain mutation
     if math.random(BRAIN_MUTATION_PROB) == 1 then
         child._weight_layer_1[math.random(#child._weight_layer_1)][math.random(
-            #child._weight_layer_1[1])] = math.random(
-                                              -WEIGHT_DEVIATION,
-                                              WEIGHT_DEVIATION)
+            #child._weight_layer_1[1])] =
+            math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
     end
     if math.random(BRAIN_MUTATION_PROB) == 1 then
         child._weight_layer_2[math.random(#child._weight_layer_2)][math.random(
-            #child._weight_layer_2[1])] = math.random(
-                                              -WEIGHT_DEVIATION,
-                                              WEIGHT_DEVIATION)
+            #child._weight_layer_2[1])] =
+            math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
     end
 
     assert(child._weight_layer_1)
@@ -71,8 +75,7 @@ function bot.new()
 
         weight_row = {}
         for j = 1, 5 do
-            weight_row[j] = math.random(-WEIGHT_DEVIATION,
-                                        WEIGHT_DEVIATION)
+            weight_row[j] = math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
         end
 
         weight_layer_1[i] = weight_row
@@ -84,19 +87,14 @@ function bot.new()
 
         weight_row = {}
         for j = 1, 4 do
-            weight_row[j] = math.random(-WEIGHT_DEVIATION,
-                                        WEIGHT_DEVIATION)
+            weight_row[j] = math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
         end
 
         weight_layer_2[i] = weight_row
     end
 
     ---@type integer[]
-    local genes = {
-        math.random(255),
-        math.random(255),
-        math.random(255)
-    }
+    local genes = {math.random(255), math.random(255), math.random(255)}
 
     ---@type bot
     local self = setmetatable({
@@ -105,7 +103,8 @@ function bot.new()
         _weight_layer_1 = weight_layer_1,
         _weight_layer_2 = weight_layer_2,
         _energy = math.random(5) + 5,
-        _genes = genes
+        _genes = genes,
+        _life_counter = 0
     }, bot)
 
     assert(self._weight_layer_1)
@@ -221,19 +220,23 @@ end
 
 ---@public
 ---@param observed_cell cell
----@return BOT_ACTION
+---@return BOT_ACTION|nil
 ---@nodiscard
 function bot:get_action(observed_cell)
+    if self._life_counter == MAX_AGE then
+        return nil
+    end
+    self._life_counter = self._life_counter + 1
     self._energy = self._energy - 2
 
     ---@type integer[]
     local input_data = {}
 
-    table.insert(input_data, self._energy / 5)
+    table.insert(input_data, self._energy)
     table.insert(input_data, self._direction_x)
     table.insert(input_data, self._direction_y)
     table.insert(input_data, observed_cell:has_bot() and 1 or 0)
-    table.insert(input_data, observed_cell:get_energy() / 5)
+    table.insert(input_data, observed_cell:get_energy())
 
     ---@type BOT_ACTION
     return self:brain_response(input_data)

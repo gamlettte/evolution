@@ -3,9 +3,9 @@ local BOT_ACTION = {
     ACTION = {
         NOTHING = 1,
         MOVE = 2,
-        CONSUME_ENERGY = 3,
-        CONSUME_BOT = 4,
-        MULTIPLY = 5
+        CONSUME_BOT = 3,
+        MULTIPLY = 4,
+        CONSUME_ENERGY = 5,
     },
     ACTION_SIZE = 5
 }

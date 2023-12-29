@@ -6,7 +6,6 @@ local bot_actions = require("field.bot_actions")
 ---@field private _height integer
 ---@field private _width integer
 ---@field private _grid cell[][]
----@field private _grid_help integer[]
 local field = {}
 field.__index = field
 
@@ -42,8 +41,8 @@ function field.new(height, width, population)
     local self = setmetatable({
         _height = height,
         _width = width,
-        _grid = grid
-    }, field)
+        _grid = grid}
+    ,field)
 
     return self
 end
@@ -132,7 +131,7 @@ end
 function field:update_energy()
     for i = 1, self._height do
         for j = 1, self._width do
-            if self._grid[i][j]:get_energy() < 50 then
+            if self._grid[i][j]:get_energy() < 80 then
                 self._grid[i][j]:add_energy(14)
             end
         end
@@ -173,21 +172,21 @@ function field:get_iteration()
                 assert(dir_x <= 1 and dir_x >= -1)
                 assert(dir_y <= 1 and dir_y >= -1)
                 assert(dir_y + i <= self._height)
-
                 assert(self._grid[i])
-                assert(self._grid[i + dir_y],
-                       "i=" .. i .. " dy=" .. dir_y)
+                assert(self._grid[i + dir_y], "i=" .. i .. " dy=" .. dir_y)
+
                 ---@type cell
                 local observed_cell = self._grid[i + dir_y][j + dir_x]
 
                 ---@type BOT_ACTION
-                local bot_action = current_cell:get_action(
-                                       observed_cell)
+                local bot_action = current_cell:get_action(observed_cell)
 
                 if bot_action == bot_actions.ACTION.MOVE then
-                    result._grid[dir_y + i][dir_x + j] = current_cell
-                    current_cell:kill_bot()
-                    move_count = move_count + 1
+                    if observed_cell:has_bot() then
+                        observed_cell:accept_bot(current_cell:get_bot())
+                        current_cell:kill_bot()
+                        move_count = move_count + 1
+                    end
 
                 elseif bot_action == bot_actions.ACTION.CONSUME_ENERGY then
                     current_cell:feed_bot()
@@ -195,24 +194,25 @@ function field:get_iteration()
 
                 elseif bot_action == bot_actions.ACTION.CONSUME_BOT then
                     current_cell:feed_bot(observed_cell:kill_bot())
+                    --observed_cell:accept_bot(current_cell:get_bot())
+                    current_cell:kill_bot()
                     consume_bot_count = consume_bot_count + 1
 
                 elseif bot_action == bot_actions.ACTION.MULTIPLY then
                     if current_cell:get_bot_energy() <= 10 then
                         current_cell:kill_bot()
                     else
-                        result._grid[i + math.random(-1, 1)][j +
-                            math.random(-1, 1)]:accept_bot(
-                            current_cell:get_child())
+                        result._grid[i + math.random(-1, 1)]
+                            [j + math.random(-1, 1)]
+                            :accept_bot(current_cell:get_child())
                         multiply_count = multiply_count + 1
                     end
                 end
+                result._grid[i + dir_y][j + dir_x] = observed_cell
                 result._grid[i][j] = current_cell
             end
         end
     end
-    -- print("move "..move_count.." CE "..consume_energy_count.." CB "
-    -- ..consume_bot_count.." multiply "..multiply_count)
 
     for i = 2, self._height - 1 do
         for j = 2, self._width - 1 do
