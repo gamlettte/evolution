@@ -14,11 +14,31 @@ bot.__index = bot
 local WEIGHT_DEVIATION = 10
 
 ---@type integer
-local BRAIN_MUTATION_PROB = 10
-
+local BRAIN_MUTATION_SPAWN_PROB = 10
 
 ---@type integer
-local MAX_AGE = 40
+local BRAIN_MUTATION_ACTION_PROB = 20
+
+---@type integer
+local MAX_AGE = 700
+
+---@private
+---@return nil
+function bot:run_brain_mutation()
+
+    -- brain mutation
+    if math.random(BRAIN_MUTATION_SPAWN_PROB) == 1 then
+        self._weight_layer_1[math.random(#self._weight_layer_1)][math.random(
+            #self._weight_layer_1[1])] =
+            math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
+    end
+    if math.random(BRAIN_MUTATION_SPAWN_PROB) == 1 then
+        self._weight_layer_2[math.random(#self._weight_layer_2)][math.random(
+            #self._weight_layer_2[1])] =
+            math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
+    end
+
+end
 
 ---@public
 ---@return bot
@@ -42,17 +62,7 @@ function bot:get_child()
         child._genes[index] = child._genes[index] + math.random(-1, 1)
     end
 
-    -- brain mutation
-    if math.random(BRAIN_MUTATION_PROB) == 1 then
-        child._weight_layer_1[math.random(#child._weight_layer_1)][math.random(
-            #child._weight_layer_1[1])] =
-            math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
-    end
-    if math.random(BRAIN_MUTATION_PROB) == 1 then
-        child._weight_layer_2[math.random(#child._weight_layer_2)][math.random(
-            #child._weight_layer_2[1])] =
-            math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
-    end
+    child:run_brain_mutation()
 
     assert(child._weight_layer_1)
     assert(child._weight_layer_2)
@@ -71,7 +81,7 @@ function bot.new()
 
     ---@type integer[][]
     local weight_layer_1 = {}
-    for i = 1, 4 do
+    for i = 1, 5 do
 
         weight_row = {}
         for j = 1, 5 do
@@ -86,7 +96,7 @@ function bot.new()
     for i = 1, bot_actions.ACTION_SIZE + 2 - 1 do
 
         weight_row = {}
-        for j = 1, 4 do
+        for j = 1, 5 do
             weight_row[j] = math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
         end
 
@@ -94,7 +104,11 @@ function bot.new()
     end
 
     ---@type integer[]
-    local genes = {math.random(255), math.random(255), math.random(255)}
+    local genes = {
+        math.random(255),
+        math.random(255),
+        math.random(255)
+    }
 
     ---@type bot
     local self = setmetatable({
@@ -226,8 +240,12 @@ function bot:get_action(observed_cell)
     if self._life_counter == MAX_AGE then
         return nil
     end
+
+    if math.random(BRAIN_MUTATION_ACTION_PROB) then
+        self:run_brain_mutation()
+    end
     self._life_counter = self._life_counter + 1
-    self._energy = self._energy - 2
+    self._energy = self._energy - 1
 
     ---@type integer[]
     local input_data = {}
