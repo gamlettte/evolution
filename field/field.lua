@@ -181,25 +181,37 @@ function field:get_iteration()
                 ---@type BOT_ACTION
                 local bot_action = current_cell:get_action(observed_cell)
 
-                if bot_action == bot_actions.ACTION.MOVE then
-                    if observed_cell:has_bot() then
+                if bot_action == bot_actions.ACTION.MOVE
+                then
+                    if not observed_cell:has_bot() then
                         observed_cell:accept_bot(current_cell:get_bot())
                         current_cell:kill_bot()
                         move_count = move_count + 1
                     end
 
-                elseif bot_action == bot_actions.ACTION.CONSUME_ENERGY then
+                elseif bot_action == bot_actions.ACTION.CONSUME_ENERGY
+                then
                     current_cell:feed_bot()
                     consume_energy_count = consume_energy_count + 1
 
-                elseif bot_action == bot_actions.ACTION.CONSUME_BOT then
-                    current_cell:feed_bot(observed_cell:kill_bot())
-                    --observed_cell:accept_bot(current_cell:get_bot())
-                    current_cell:kill_bot()
+                elseif
+                    bot_action == bot_actions.ACTION.CONSUME_BOT
+                    --false
+                then
+                    ---@type integer
+                    local energy = observed_cell:kill_bot()
+                    if current_cell:has_bot() then
+                        current_cell:feed_bot(energy)
+                        observed_cell:accept_bot(current_cell:get_bot())
+                        current_cell:kill_bot()
+                    end
                     consume_bot_count = consume_bot_count + 1
 
-                elseif bot_action == bot_actions.ACTION.MULTIPLY then
-                    if current_cell:get_bot_energy() <= 10 then
+                elseif bot_action == bot_actions.ACTION.MULTIPLY
+                then
+                    if
+                        current_cell:get_bot_energy() <= 10
+                    then
                         current_cell:kill_bot()
                     else
                         result._grid[i + math.random(-1, 1)]

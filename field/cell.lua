@@ -86,6 +86,7 @@ end
 ---@param new_energy integer|nil
 ---@return nil
 function cell:feed_bot(new_energy)
+    assert(self:has_bot())
     if self:has_bot() then
         self._bot_place:add_energy(new_energy and new_energy or self._energy)
         self._energy = new_energy or 0

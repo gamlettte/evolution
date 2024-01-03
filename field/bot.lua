@@ -1,4 +1,5 @@
 local bot_actions = require("field.bot_actions")
+
 ---@class bot
 ---@field private _weight_layer_1 integer[][]
 ---@field private _weight_layer_2 integer[][]
@@ -11,13 +12,13 @@ local bot = {}
 bot.__index = bot
 
 ---@type integer
-local WEIGHT_DEVIATION = 10
+local WEIGHT_DEVIATION = 20
 
 ---@type integer
-local BRAIN_MUTATION_SPAWN_PROB = 10
+local BRAIN_MUTATION_SPAWN_PROB = 100
 
 ---@type integer
-local BRAIN_MUTATION_ACTION_PROB = 20
+local BRAIN_MUTATION_ACTION_PROB = 1000
 
 ---@type integer
 local MAX_AGE = 700
@@ -37,8 +38,8 @@ function bot:run_brain_mutation()
             #self._weight_layer_2[1])] =
             math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
     end
-
 end
+
 
 ---@public
 ---@return bot
@@ -54,6 +55,8 @@ function bot:get_child()
         _genes = self._genes,
         _life_counter = 0
     }, bot)
+
+    self._energy = self._energy - 8
 
     -- gene mutation
     if math.random(5) == 1 then
@@ -198,9 +201,9 @@ function bot:brain_response(input_vector)
     table.insert(direction_vector, table.remove(r2, #r2))
 
     for index, value in ipairs(direction_vector) do
-        if value < 0.3 and value > 0 then
+        if value < 0.1 and value > 0 then
             direction_vector[index] = -1
-        elseif value < 0.7 then
+        elseif value < 0.5 then
             direction_vector[index] = 0
         elseif value < 1 then
             direction_vector[index] = 1
@@ -245,15 +248,21 @@ function bot:get_action(observed_cell)
         self:run_brain_mutation()
     end
     self._life_counter = self._life_counter + 1
-    self._energy = self._energy - 1
+
+    --self._energy = self._energy - 1
 
     ---@type integer[]
     local input_data = {}
 
+    local observed_cell_has_bot = (observed_cell:has_bot() and
+                                      not (self._direction_x == 0
+                                           and self._direction_y == 0))
+                                  and 10 or 0
+
     table.insert(input_data, self._energy)
-    table.insert(input_data, self._direction_x)
-    table.insert(input_data, self._direction_y)
-    table.insert(input_data, observed_cell:has_bot() and 1 or 0)
+    table.insert(input_data, self._direction_x * 10)
+    table.insert(input_data, self._direction_y * 10)
+    table.insert(input_data, observed_cell_has_bot)
     table.insert(input_data, observed_cell:get_energy())
 
     ---@type BOT_ACTION

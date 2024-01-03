@@ -7,16 +7,16 @@ math.randomseed(os.clock())
 local size = 115
 
 ---@type integer
-local y_size = 55
+local y_size = 115
 
 ---@type integer
-local x_size = 210
+local x_size = 470
 
 ---@type integer
 local MINIMAL_SUCCESS_ITERATIONS = 500
 
 ---@type integer
-local INITIAL_PLACEMENT_PROMILE = 90
+local INITIAL_PLACEMENT_PROMILE = 50
 
 ---@type stdscr
 local stdscr = curses.initscr()
