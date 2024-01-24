@@ -30,12 +30,12 @@ function cell:get_action(observed_cell)
 
     if self._bot_place:get_energy() <= 0 then
         self._bot_place = nil
-        return bot_actions.ACTION.NOTHING --[[@as BOT_ACTION]]
+        return bot_actions.ENUM.NOTHING --[[@as BOT_ACTION]]
     end
     local result = self._bot_place:get_action(observed_cell)
     if result == nil then
         self._bot_place = nil
-        result = bot_actions.ACTION.NOTHING
+        result = bot_actions.ENUM.NOTHING
     end
     return result
 end
@@ -58,6 +58,7 @@ function cell:accept_bot(new_bot)
     self._bot_place = new_bot
 end
 
+
 ---@public
 ---@return bot
 ---@nodiscard
@@ -65,6 +66,7 @@ function cell:get_bot()
     assert(self:has_bot())
     return self._bot_place
 end
+
 
 ---@public
 ---@return boolean
@@ -88,7 +90,8 @@ end
 function cell:feed_bot(new_energy)
     assert(self:has_bot())
     if self:has_bot() then
-        self._bot_place:add_energy(new_energy and new_energy or self._energy)
+        self._bot_place:add_energy(new_energy and new_energy or
+                                       self._energy)
         self._energy = new_energy or 0
     end
 end

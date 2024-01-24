@@ -6,7 +6,7 @@ local bot_actions = require("field.bot_actions")
 ---@field private _direction_x integer
 ---@field private _direction_y integer
 ---@field private _energy integer
----@field private _genes integer[]
+---@field private _gene integer
 ---@field private _life_counter integer
 local bot = {}
 bot.__index = bot
@@ -22,6 +22,9 @@ local BRAIN_MUTATION_ACTION_PROB = 1000
 
 ---@type integer
 local MAX_AGE = 700
+
+---@type integer
+local MAX_GENE_VALUE = 94
 
 ---@private
 ---@return nil
@@ -52,17 +55,15 @@ function bot:get_child()
         _weight_layer_1 = self._weight_layer_1,
         _weight_layer_2 = self._weight_layer_2,
         _energy = math.random(5) + 5,
-        _genes = self._genes,
+        _gene = self._gene,
         _life_counter = 0
     }, bot)
 
     self._energy = self._energy - 8
 
     -- gene mutation
-    if math.random(5) == 1 then
-        ---@type integer
-        local index = math.random(3)
-        child._genes[index] = child._genes[index] + math.random(-1, 1)
+    if math.random(15) == 1 then
+        child._gene = child._gene + math.random(-1, 1)
     end
 
     child:run_brain_mutation()
@@ -106,12 +107,8 @@ function bot.new()
         weight_layer_2[i] = weight_row
     end
 
-    ---@type integer[]
-    local genes = {
-        math.random(255),
-        math.random(255),
-        math.random(255)
-    }
+    ---@type integer
+    local gene = math.random(MAX_GENE_VALUE)
 
     ---@type bot
     local self = setmetatable({
@@ -120,7 +117,7 @@ function bot.new()
         _weight_layer_1 = weight_layer_1,
         _weight_layer_2 = weight_layer_2,
         _energy = math.random(5) + 5,
-        _genes = genes,
+        _gene = gene,
         _life_counter = 0
     }, bot)
 
@@ -249,7 +246,7 @@ function bot:get_action(observed_cell)
     end
     self._life_counter = self._life_counter + 1
 
-    --self._energy = self._energy - 1
+    self._energy = self._energy - 1
 
     ---@type integer[]
     local input_data = {}

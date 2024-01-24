@@ -1,6 +1,6 @@
 local BOT_ACTION = {
     ---@enum BOT_ACTION
-    ACTION = {
+    ENUM = {
         NOTHING = 1,
         MOVE = 2,
         CONSUME_BOT = 3,
