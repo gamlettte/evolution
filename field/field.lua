@@ -11,12 +11,13 @@ field.__index = field
 ---@public
 ---@param height integer field width
 ---@param width integer field height
----@param population integer spawn rate of bots in %
+---@param population integer spawn rate of bots in promile
 ---@return field
 ---@nodiscard
 function field.new(height, width, population)
     assert(height > 0)
     assert(width > 0)
+    assert(population > 0 and population <= 1000)
 
     ---@type cell[][]
     local grid = {}
@@ -131,7 +132,7 @@ function field:update_energy()
     for i = 1, self._height do
         for j = 1, self._width do
             if self._grid[i][j]:get_energy() < 80 then
-                self._grid[i][j]:add_energy(14)
+                self._grid[i][j]:add_energy(6)
             end
         end
     end
@@ -141,40 +142,33 @@ end
 ---@param current_cell cell
 ---@param bot_action BOT_ACTION
 ---@param observed_cell cell
----@return cell, cell, bot|nil -- current cell, observed cell, new bot
+---@return cell, cell, bot? -- current cell, observed cell, new bot
 function field.process_cells(current_cell, bot_action, observed_cell)
 
-    ---@type bot|nil
+    ---@type bot?
     local child_bot = nil
 
-    if bot_action == bot_actions.ENUM.MOVE
-    then
+    if bot_action == bot_actions.ENUM.MOVE then
         if not observed_cell:has_bot() then
             observed_cell:accept_bot(current_cell:get_bot())
             current_cell:kill_bot()
         end
 
-    elseif bot_action == bot_actions.ENUM.CONSUME_ENERGY
-    then
+    elseif bot_action == bot_actions.ENUM.CONSUME_ENERGY then
         current_cell:feed_bot()
 
-    elseif
-        bot_action == bot_actions.ENUM.CONSUME_BOT
-        --false
-    then
+    elseif bot_action == bot_actions.ENUM.CONSUME_BOT then
         ---@type integer
         local energy = observed_cell:kill_bot()
+
         if current_cell:has_bot() then
             current_cell:feed_bot(energy)
             observed_cell:accept_bot(current_cell:get_bot())
             current_cell:kill_bot()
         end
 
-    elseif bot_action == bot_actions.ENUM.MULTIPLY
-    then
-        if
-            current_cell:get_bot_energy() <= 10
-        then
+    elseif bot_action == bot_actions.ENUM.MULTIPLY then
+        if current_cell:get_bot_energy() <= 10 then
             current_cell:kill_bot()
         else
             child_bot = current_cell:get_child()
@@ -182,6 +176,16 @@ function field.process_cells(current_cell, bot_action, observed_cell)
     end
 
     return current_cell, observed_cell, child_bot
+end
+
+
+---@private
+---@param position integer
+---@param shift integer
+---@param max integer
+---@return integer
+local function get_shift(position, shift, max)
+    return (position - shift + max - 1) % max + 1
 end
 
 ---@public
@@ -192,29 +196,42 @@ function field:get_iteration()
     ---@type field
     local result = field.new_default(self)
 
-    for i = 2, self._height - 1 do
-        for j = 2, self._width - 1 do
+    ---@type integer[]
+    local action_data = {}
+
+    for i = 1, self._height do
+        for j = 1, self._width do
+
             ---@type integer[]
             if self._grid[i][j]:has_bot() then
+
                 ---@type cell
                 local current_cell = self._grid[i][j]
 
                 ---@type integer, integer
-                local dir_y, dir_x = current_cell:get_bot_pov()
+                local d_y, d_x = current_cell:get_bot_pov()
 
-                assert(dir_x <= 1 and dir_x >= -1)
-                assert(dir_y <= 1 and dir_y >= -1)
-                assert(dir_y + i <= self._height)
+                ---@type integer
+                local dir_y = get_shift(i, d_y, self._height)
+
+                ---@type integer
+                local dir_x = get_shift(j, d_x, self._width)
+
                 assert(self._grid[i])
-                assert(self._grid[i + dir_y], "i=" .. i .. " dy=" .. dir_y)
 
                 ---@type cell
-                local observed_cell = self._grid[i + dir_y][j + dir_x]
+                local observed_cell = self._grid[dir_y][dir_x]
 
-                ---@type BOT_ACTION
+                ---@type BOT_ACTION?
                 local bot_action = current_cell:get_action(observed_cell)
 
-                ---@type bot|nil
+                if bot_action then
+                    action_data[bot_action] = action_data[bot_action]
+                                              and action_data[bot_action] + 1
+                                              or 1
+                end
+
+                ---@type bot?
                 local child_bot
 
                 current_cell,
@@ -223,16 +240,19 @@ function field:get_iteration()
                                                 bot_action,
                                                 observed_cell)
                 if child_bot then
-                    result._grid[i + math.random(-1, 1)]
-                                [j + math.random(-1, 1)]
+                    result._grid[get_shift(i, math.random(-1, 1), self._height)]
+                                [get_shift(j, math.random(-1, 1), self._width)]
                         :accept_bot(child_bot)
                 end
 
-                result._grid[i + dir_y][j + dir_x] = observed_cell
+                result._grid[dir_y][dir_x] = observed_cell
                 result._grid[i][j] = current_cell
-                result._grid[i][j]._energy = self._grid[i][j]._energy
             end
         end
+    end
+
+    for key, value in ipairs(action_data) do
+        print(key.." "..value)
     end
 
     assert(result._grid[1] ~= nil)

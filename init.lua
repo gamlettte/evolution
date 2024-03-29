@@ -1,5 +1,11 @@
 local field = require("field.field")
+
 local curses = require("curses")
+
+---@module socket
+local socket = require("socket")
+
+local args = {...}
 
 math.randomseed(os.clock())
 
@@ -18,18 +24,19 @@ local y_screen_size = curses.lines()
 local x_screen_size = curses.cols()
 
 ---@type integer
-local y_size = y_screen_size - 2
+local y_size = y_screen_size - 3
 
 ---@type integer
 local x_size = x_screen_size - 3
 
 ---@type integer
-local MINIMAL_SUCCESS_ITERATIONS = 500
+local MINIMAL_SUCCESS_ITERATIONS = 10000
 
 ---@type integer
-local INITIAL_PLACEMENT_PROMILE = 100
+local INITIAL_PLACEMENT_PROMILE = 500
 
--- while true do
+---@type integer
+local LOG_PRINTOUT_THRESHOOLD = MINIMAL_SUCCESS_ITERATIONS / 100
 
 while true do
     ---@type field
@@ -38,15 +45,23 @@ while true do
 
     ---@type integer
     local iteration_counter = 0
+
     while true do
+        --socket.sleep(0.1)
         ---@type integer
         local start_time_1 = os.clock()
 
         a:get_iteration()
         iteration_counter = iteration_counter + 1
 
-        if -- iteration_counter > MINIMAL_SUCCESS_ITERATIONS
-        true -- false
+        if iteration_counter % LOG_PRINTOUT_THRESHOOLD < (iteration_counter - 1) % LOG_PRINTOUT_THRESHOOLD then
+            print(math.floor(iteration_counter / LOG_PRINTOUT_THRESHOOLD).." % done\r")
+        end
+
+        if --
+            iteration_counter > MINIMAL_SUCCESS_ITERATIONS
+        -- true
+        -- false
         then
             local grid = a:to_print()
 
@@ -61,9 +76,7 @@ while true do
             stdscr:refresh()
         end
 
-        ---@type integer
-        local bot_count = a:count_bots()
-        if bot_count == 0 then
+        if a:count_bots() == 0 then
             print("FAILED!!!\r")
             break
         end

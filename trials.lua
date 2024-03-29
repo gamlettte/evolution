@@ -1,14 +1,28 @@
-local lanes = require "lanes".configure()
+---@type thread
+local a = coroutine.create(
+    function ()
+        for i = 1, 10 do
+            print("hello from a"..i)
+            coroutine.yield()
+        end
+    end
+)
 
-local function calculate(a,b,c)
-  if not a then
-    error "sample error; propagated to main lane when reading results"
-  end
-  return a+b+c
+local b = coroutine.create(
+    function ()
+        for i = 1, 12, 1 do
+
+            print("hello from b"..i)
+
+            coroutine.resume(a)
+
+            coroutine.yield()
+        end
+    end
+)
+
+for _ = 1, 10, 1 do
+    coroutine.resume(b)
 end
 
-local h1= lanes.gen("base", calculate)(1,2,3)
-local h2= lanes.gen("base", calculate)(10,20,30)
-local h3= lanes.gen("base", calculate)(100,200,300)
-
-print( h1[1], h2[1], h3[1] )     -- pends for the results, or propagates error
+print(coroutine.status(a))

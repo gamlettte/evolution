@@ -2,7 +2,7 @@
 ---@field private _is_errors boolean
 ---@field private _test_cases table
 ---@field private __index any
-test_runner = {}
+local test_runner = {}
 test_runner.__index = test_runner
 
 

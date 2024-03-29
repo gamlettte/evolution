@@ -2,7 +2,7 @@ local bot = require("field.bot")
 local bot_actions = require("field.bot_actions")
 
 ---@class cell
----@field private _bot_place bot|nil
+---@field private _bot_place bot?
 ---@field public _energy integer
 local cell = {}
 cell.__index = cell
@@ -23,19 +23,21 @@ end
 
 ---@public
 ---@param observed_cell cell
----@return BOT_ACTION
+---@return BOT_ACTION?
 ---@nodiscard
 function cell:get_action(observed_cell)
     assert(self:has_bot())
 
     if self._bot_place:get_energy() <= 0 then
         self._bot_place = nil
-        return bot_actions.ENUM.NOTHING --[[@as BOT_ACTION]]
+        return nil
     end
+
+    ---@type BOT_ACTION?
     local result = self._bot_place:get_action(observed_cell)
+
     if result == nil then
         self._bot_place = nil
-        result = bot_actions.ENUM.NOTHING
     end
     return result
 end
@@ -85,7 +87,7 @@ end
 
 
 ---@public
----@param new_energy integer|nil
+---@param new_energy integer?
 ---@return nil
 function cell:feed_bot(new_energy)
     assert(self:has_bot())
