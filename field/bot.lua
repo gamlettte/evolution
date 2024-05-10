@@ -1,11 +1,14 @@
 local bot_actions = require("field.bot_actions")
 
+local perceptron = require("field.perceptron.perceptron")
+local activation_functions = require("field.perceptron.activation_functions")
+
 
 _G.bot_brain_count = 0
+local brain_structure = {5, 5, 5}
 
 ---@class bot
----@field private _weight_layer_1 integer[][]
----@field private _weight_layer_2 integer[][]
+---@field private _brain perceptron
 ---@field private _direction_x integer
 ---@field private _direction_y integer
 ---@field private _energy integer
@@ -33,14 +36,7 @@ local MAX_GENE_VALUE = 94
 ---@return nil
 function bot:run_brain_mutation()
     if math.random(BRAIN_MUTATION_SPAWN_PROB) == 1 then
-        self._weight_layer_1[math.random(#self._weight_layer_1)]
-                            [math.random(#self._weight_layer_1[1])]
-        = math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
-    end
-    if math.random(BRAIN_MUTATION_SPAWN_PROB) == 1 then
-        self._weight_layer_2[math.random(#self._weight_layer_2)]
-                            [math.random(#self._weight_layer_2[1])]
-        = math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
+        self._brain:mutate()
     end
 end
 
@@ -50,41 +46,11 @@ end
 ---@nodiscard
 function bot:get_child()
 
-    ---@type number[][]
-    local new_weight_layer_1 = {}
-    for _, value in ipairs(self._weight_layer_1) do
-        ---@type number[]
-        local row = {}
-        for _, v in ipairs(value) do
-            row[#row + 1] = v
-        end
-        new_weight_layer_1[#new_weight_layer_1 + 1] = row
-    end
-
-    ---@type number[][]
-    local new_weight_layer_2 = {}
-    for _, value in ipairs(self._weight_layer_1) do
-        ---@type number[]
-        local row = {}
-        for _, v in ipairs(value) do
-            row[#row + 1] = v
-        end
-        new_weight_layer_2[#new_weight_layer_2 + 1] = row
-    end
---[[
-    ---@type integer[]
-    local new_gene = {}
-    for _, value in ipairs(self._gene) do
-        new_gene[#new_gene + 1] = value
-    end
-    ]]
-
     ---@type bot
     local child = setmetatable({
         _direction_y = math.random(-1, 1),
         _direction_x = math.random(-1, 1),
-        _weight_layer_1 = new_weight_layer_1,
-        _weight_layer_2 = new_weight_layer_2,
+        _brain = self._brain:new_deep_copy(),
         _energy = math.random(3) + 5,
         _gene = self._gene,
         _life_counter = 0
@@ -96,10 +62,9 @@ function bot:get_child()
         child._gene = child._gene + math.random(-1, 1)
     end
 
-    child:run_brain_mutation()
-
-    assert(child._weight_layer_1)
-    assert(child._weight_layer_2)
+    if math.random(BRAIN_MUTATION_SPAWN_PROB) == 1 then
+        child._brain:mutate()
+    end
 
     return child
 end
@@ -110,31 +75,6 @@ end
 ---@nodiscard
 function bot.new()
 
-    ---@type integer[]
-    local weight_row = {}
-
-    ---@type integer[][]
-    local weight_layer_1 = {}
-
-    for i = 1, 5 do
-        weight_row = {}
-        for j = 1, 5 do
-            weight_row[j] = math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
-        end
-        weight_layer_1[i] = weight_row
-    end
-
-    ---@type integer[][]
-    local weight_layer_2 = {}
-
-    for i = 1, bot_actions.ACTION_SIZE + 2 - 1 do
-        weight_row = {}
-        for j = 1, 5 do
-            weight_row[j] = math.random(-WEIGHT_DEVIATION, WEIGHT_DEVIATION)
-        end
-        weight_layer_2[i] = weight_row
-    end
-
     ---@type integer
     local gene = math.random(MAX_GENE_VALUE)
 
@@ -142,15 +82,12 @@ function bot.new()
     local self = setmetatable({
         _direction_y = math.random(-1, 1),
         _direction_x = math.random(-1, 1),
-        _weight_layer_1 = weight_layer_1,
-        _weight_layer_2 = weight_layer_2,
+        _brain = perceptron.new(brain_structure, activation_functions.ENUM.SIGMOID.FUNCTION,
+                                                 activation_functions.ENUM.SIGMOID.DERIVATIVE),
         _energy = math.random(3) + 5,
         _gene = gene,
         _life_counter = 0
     }, bot)
-
-    assert(self._weight_layer_1)
-    assert(self._weight_layer_2)
 
     return self
 end
@@ -218,12 +155,7 @@ end
 ---@return BOT_ACTION
 ---@nodiscard
 function bot:brain_response(input_vector)
-    ---@type integer[]
-    local r1 = pass_layer(input_vector, self._weight_layer_1)
-
-    ---@type integer[]
-    local r2 = pass_layer(r1, self._weight_layer_2)
-    assert(r2[1])
+    local r2 = self._brain:run(input_vector)
 
     ---@type integer[]
     local direction_vector = {}
@@ -249,7 +181,7 @@ function bot:brain_response(input_vector)
     ---@type number
     local max_val = 0.0
 
-    assert(#r2 == bot_actions.ACTION_SIZE - 1)
+    assert(#r2 == bot_actions.ACTION_SIZE - 1, "r2 = "..#r2.." bas = "..bot_actions.ACTION_SIZE)
 
     for index, value in ipairs(r2) do
         assert(value >= 0 and value <= 1, "value = " .. value)
@@ -275,8 +207,9 @@ function bot:get_action(observed_cell)
     end
 
     if math.random(BRAIN_MUTATION_ACTION_PROB) then
-        self:run_brain_mutation()
+        self._brain:mutate()
     end
+
     self._life_counter = self._life_counter + 1
 
     self._energy = self._energy - 1
@@ -289,11 +222,11 @@ function bot:get_action(observed_cell)
                                            and self._direction_y == 0))
                                   and 10 or 0
 
-    table.insert(input_data, self._energy)
-    table.insert(input_data, self._direction_x * 10)
-    table.insert(input_data, self._direction_y * 10)
+    table.insert(input_data, self._energy / 5)
+    table.insert(input_data, self._direction_x)
+    table.insert(input_data, self._direction_y)
     table.insert(input_data, observed_cell_has_bot)
-    table.insert(input_data, observed_cell:get_energy())
+    table.insert(input_data, observed_cell:get_energy() / 5)
 
     ---@type BOT_ACTION
     return self:brain_response(input_data)

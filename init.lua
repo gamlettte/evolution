@@ -58,9 +58,9 @@ while true do
             print(math.floor(iteration_counter / LOG_PRINTOUT_THRESHOOLD).." % done\r")
         end
 
-        if --
-            iteration_counter > MINIMAL_SUCCESS_ITERATIONS
-        -- true
+        if 
+        -- iteration_counter > MINIMAL_SUCCESS_ITERATIONS
+        true
         -- false
         then
             local grid = a:to_print()

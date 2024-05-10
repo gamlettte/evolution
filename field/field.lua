@@ -131,8 +131,8 @@ end
 function field:update_energy()
     for i = 1, self._height do
         for j = 1, self._width do
-            if self._grid[i][j]:get_energy() < 80 then
-                self._grid[i][j]:add_energy(6)
+            if self._grid[i][j]:get_energy() < 30 then
+                self._grid[i][j]:add_energy(5)
             end
         end
     end
