@@ -131,8 +131,8 @@ end
 function field:update_energy()
     for i = 1, self._height do
         for j = 1, self._width do
-            if self._grid[i][j]:get_energy() < 80 then
-                self._grid[i][j]:add_energy(6)
+            if self._grid[i][j]:get_energy() < 10 then
+                self._grid[i][j]:add_energy(3)
             end
         end
     end
@@ -184,17 +184,22 @@ end
 ---@param shift integer
 ---@param max integer
 ---@return integer
-local function get_shift(position, shift, max)
+---@nodiscard
+local function get_shifted(position, shift, max)
     return (position - shift + max - 1) % max + 1
 end
 
 ---@public
----@return nil
-function field:get_iteration()
+---@param result field
+---@return integer[] action_data
+---@nodiscard
+function field:get_iteration(result)
     self:update_energy()
 
+    --[[
     ---@type field
     local result = field.new_default(self)
+    ]]--
 
     ---@type integer[]
     local action_data = {}
@@ -212,13 +217,14 @@ function field:get_iteration()
                 local d_y, d_x = current_cell:get_bot_pov()
 
                 ---@type integer
-                local dir_y = get_shift(i, d_y, self._height)
+                local dir_y = get_shifted(i, d_y, self._height)
 
                 ---@type integer
-                local dir_x = get_shift(j, d_x, self._width)
+                local dir_x = get_shifted(j, d_x, self._width)
 
                 assert(self._grid[i])
 
+                assert(self._grid[dir_y], dir_y .. " " .. dir_x)
                 ---@type cell
                 local observed_cell = self._grid[dir_y][dir_x]
 
@@ -226,9 +232,11 @@ function field:get_iteration()
                 local bot_action = current_cell:get_action(observed_cell)
 
                 if bot_action then
-                    action_data[bot_action] = action_data[bot_action]
-                                              and action_data[bot_action] + 1
-                                              or 1
+                    if action_data[bot_action] then
+                        action_data[bot_action] = action_data[bot_action] + 1
+                    else
+                        table.insert(action_data, bot_action, 1)
+                    end
                 end
 
                 ---@type bot?
@@ -240,8 +248,8 @@ function field:get_iteration()
                                                 bot_action,
                                                 observed_cell)
                 if child_bot then
-                    result._grid[get_shift(i, math.random(-1, 1), self._height)]
-                                [get_shift(j, math.random(-1, 1), self._width)]
+                    result._grid[get_shifted(i, math.random(-1, 1), self._height)]
+                                [get_shifted(j, math.random(-1, 1), self._width)]
                         :accept_bot(child_bot)
                 end
 
@@ -251,12 +259,10 @@ function field:get_iteration()
         end
     end
 
-    for key, value in ipairs(action_data) do
-        print(key.." "..value)
-    end
-
     assert(result._grid[1] ~= nil)
     self._grid = result._grid
+
+    return action_data
 end
 
 

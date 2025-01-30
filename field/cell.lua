@@ -39,6 +39,7 @@ function cell:get_action(observed_cell)
     if result == nil then
         self._bot_place = nil
     end
+
     return result
 end
 

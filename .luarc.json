@@ -1,0 +1,14 @@
+{
+    "runtime.version": "Lua 5.3",
+    "runtime.special": {
+        "love.filesystem.load": "loadfile"
+    },
+    "workspace.library": [
+        "${3rd}/love2d/library",
+        "${3rd}/lfs/library"
+    ],
+    "diagnostics.globals": [
+        "vim",
+        "lfs"
+    ]
+}
