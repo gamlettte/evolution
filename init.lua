@@ -10,48 +10,92 @@ local field_manager = require("field.field_manager")
 ---@module "curses"
 local curses = require("curses")
 
+---@module "configs.tui_config"
+local tui_config = require("configs.tui_config")
+
+---@module "configs.field_config"
+local field_config = require("configs.field_config")
+
 ---@module "argparse"
 local argparse = require("argparse")
 
-local parser = argparse()
 
-parser:option("--visualize")
-    :choices({
-        "always",
-        "from_set_moment",
-        "never"
-    })
+---@private
+---@param is_visualize_argument string
+---@param iteration_counter integer
+---@param MINIMAL_SUCCESS_ITERATIONS integer
+---@param CONST_FRAME_PRINT_RATE integer
+---@return boolean
+---@nodiscard
+local function is_field_visualized(is_visualize_argument,
+                                   iteration_counter,
+                                   MINIMAL_SUCCESS_ITERATIONS,
+                                   CONST_FRAME_PRINT_RATE)
+    local match = {
+        ["always"] = iteration_counter % CONST_FRAME_PRINT_RATE == 0,
+        ["from_set_moment"] = iteration_counter > MINIMAL_SUCCESS_ITERATIONS and
+            iteration_counter % CONST_FRAME_PRINT_RATE == 0,
+        ["never"] = false
+    }
 
-parser:option("--print_frame_rate")
-
-local parsed_arguments = parser:parse()
-for index, value in pairs(parsed_arguments) do
-    print(index .. " ^ " .. value)
+    return match[is_visualize_argument] or false
 end
 
 
 ---@private
----@param a_is_visualize_argument string
----@param a_iteration_counter integer
----@param a_MINIMAL_SUCCESS_ITERATIONS integer
----@return boolean
----@nodiscard
-local function is_visualized(a_is_visualize_argument,
-                             a_iteration_counter,
-                             a_MINIMAL_SUCCESS_ITERATIONS)
-    if a_is_visualize_argument == "always" then
-        return true
-    elseif a_is_visualize_argument == "from_set_moment" then
-        return a_iteration_counter > a_MINIMAL_SUCCESS_ITERATIONS
-    elseif a_is_visualize_argument == "never" then
-        return false
-    end
+---@param a_stdscr stdscr
+---@param a_field_manager field_manager
+---@param a_CONST_VISUALIZATION_MODE string
+local function update_screen(a_stdscr, a_field_manager, a_CONST_VISUALIZATION_MODE)
 
-    return false
+    ---@type integer
+    local iteration_counter = a_field_manager:get_iteration_count()
+
+    if is_field_visualized(
+        a_CONST_VISUALIZATION_MODE,
+        iteration_counter,
+        tui_config.CONST_MINIMAL_SUCCESS_ITERATIONS,
+        tui_config.CONST_FRAME_PRINT_RATE) then
+        ---@type string[]
+        local grid = a_field_manager:to_print()
+
+        a_stdscr:clear()
+
+        local y_field_size, _ = a_field_manager:get_field_sizes()
+        for i = 1, y_field_size do
+            a_stdscr:mvaddstr(i, 0, grid[i] .. " " .. i)
+        end
+
+        a_stdscr:mvaddstr(y_field_size + 1, 0,
+                        " iterations = " .. iteration_counter)
+        a_stdscr:refresh()
+    elseif iteration_counter % tui_config.CONST_LOG_PRINTOUT_THRESHOLD == 0 then
+        ---@type number
+        local percent_done = iteration_counter 
+            / tui_config.CONST_LOG_PRINTOUT_THRESHOLD
+
+        print(math.floor(percent_done) .. " % done\r")
+    end
 end
 
 
-math.randomseed(os.clock())
+local parser = argparse()
+
+parser:option("--visualize"):choices({"always", "from_set_moment", "never"})
+
+parser:option("--print_frame_rate")
+
+local parsed_arguments = parser:parse()
+
+
+---@type string
+local CONST_VISUALIZATION_MODE = parsed_arguments.visualize or
+                                tui_config.CONST_VISUALIZATION_MODE
+
+math.randomseed( 
+    0
+    -- os.clock()
+)
 
 ---@type stdscr
 local stdscr = curses.initscr()
@@ -65,39 +109,19 @@ local y_screen_size = curses.lines()
 local x_screen_size = curses.cols()
 
 ---@type integer
-local y_size = y_screen_size - 3
+local y_field_size = y_screen_size - 3
 
 ---@type integer
-local x_size = x_screen_size - 3
-
----@type integer
-local CONST_MINIMAL_SUCCESS_ITERATIONS = 10000
-
----@type integer
-local CONST_INITIAL_PLACEMENT_PROMILE = 1
-
----@type integer
-local CONST_LOG_PRINTOUT_THRESHOLD = CONST_MINIMAL_SUCCESS_ITERATIONS / 100
-
----@type string
-local CONST_IS_VISUALIZED = parsed_arguments.visualize
-
----@type integer
-local CONST_FRAME_PRINT_RATE = tonumber(parsed_arguments.print_frame_rate, 10)
+local x_field_size = x_screen_size - 3
 
 while true do
     ---@type field_manager
-    local my_field_manager = field_manager.new(y_size, x_size,
-        CONST_INITIAL_PLACEMENT_PROMILE)
-
-    ---@type integer
-    local iteration_counter = 0
+    local my_field_manager = field_manager.new(
+        y_field_size,
+        x_field_size,
+        field_config.CONST_INITIAL_PLACEMENT_PROMILE)
 
     while true do
-        --socket.sleep(0.1)
-        ---@type integer
-        local start_time_1 = os.clock()
-
         ---@type integer[]
         local action_data = my_field_manager:get_iteration()
 
@@ -106,50 +130,12 @@ while true do
         for index, value in pairs(action_data) do
             table.insert(action_data_string, index .. " = " .. value)
         end
-        -- print(table.concat(action_data_string, " ") .. "\n\r")
 
-        iteration_counter = iteration_counter + 1
+        update_screen(stdscr, my_field_manager, CONST_VISUALIZATION_MODE)
 
-        if iteration_counter % CONST_LOG_PRINTOUT_THRESHOLD <
-            (iteration_counter - 1) % CONST_LOG_PRINTOUT_THRESHOLD
-        then
-            print(math.floor(iteration_counter / CONST_LOG_PRINTOUT_THRESHOLD) .. " % done\r")
-        end
-
-        if
-            is_visualized(CONST_IS_VISUALIZED, iteration_counter, CONST_MINIMAL_SUCCESS_ITERATIONS)
-            -- iteration_counter > MINIMAL_SUCCESS_ITERATIONS
-            -- true
-            -- false
-            and
-            iteration_counter % CONST_FRAME_PRINT_RATE == 0
-        then
-            local grid = my_field_manager:to_print()
-
-            stdscr:clear()
-            for i = 1, y_size do
-                stdscr:mvaddstr(i, 0, grid[i] .. " " .. i)
-            end
-
-            stdscr:mvaddstr(y_size + 1, 0,
-                " iterations = " ..
-                iteration_counter)
-            stdscr:refresh()
-        end
-
-        ---@type integer
-        local bots_count = my_field_manager:count_bots()
-
-        if bots_count == 0 then
+        if my_field_manager:count_bots() == 0 then
             print("FAILED!!!\r")
             break
-        else
-            if false and iteration_counter % CONST_FRAME_PRINT_RATE == 0 then
-                print("current bot count = " .. bots_count)
-            end
         end
-
-        ---@type integer
-        local end_time_2 = os.clock()
     end
 end

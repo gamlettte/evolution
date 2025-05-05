@@ -15,9 +15,13 @@ field.__index = field
 ---@return field
 ---@nodiscard
 function field.new(height, width, population)
-    assert(height > 0)
-    assert(width > 0)
-    assert(population > 0 and population <= 1000)
+
+    assert(type(height) == 'number', "Error: height must be a number.")
+    assert(type(width) == 'number', "Error: width must be a number.")
+    assert(type(population) == 'number', "Error: population must be a number.")
+    assert(height > 0, "Error: height must be greater than zero.")
+    assert(width > 0, "Error: width must be greater than zero.")
+    assert(population > 0 and population <= 1000, "Error: population must be between 1 and 1000 (inclusive).")
 
     ---@type cell[][]
     local grid = {}
@@ -52,7 +56,7 @@ end
 ---@param other field
 ---@return field
 ---@nodiscard
-function field.new_default(other) -- research if other is not a copy alr..
+function field.new_default(other)
     ---@type cell[][]
     local grid = {}
 
@@ -131,7 +135,7 @@ end
 function field:update_energy()
     for i = 1, self._height do
         for j = 1, self._width do
-            if self._grid[i][j]:get_energy() < 10 then
+            if self._grid[i][j]:get_energy() < 11 then
                 self._grid[i][j]:add_energy(3)
             end
         end
@@ -140,7 +144,7 @@ end
 
 ---@private
 ---@param current_cell cell
----@param bot_action BOT_ACTION
+---@param bot_action BOT_ACTION?
 ---@param observed_cell cell
 ---@return cell, cell, bot? -- current cell, observed cell, new bot
 function field.process_cells(current_cell, bot_action, observed_cell)
@@ -148,31 +152,37 @@ function field.process_cells(current_cell, bot_action, observed_cell)
     ---@type bot?
     local child_bot = nil
 
-    if bot_action == bot_actions.ENUM.MOVE then
-        if not observed_cell:has_bot() then
-            observed_cell:accept_bot(current_cell:get_bot())
-            current_cell:kill_bot()
-        end
+    local action_table = {
+        [bot_actions.ENUM.MOVE] = function()
+            if not observed_cell:has_bot() then
+                observed_cell:accept_bot(current_cell:get_bot())
+                current_cell:kill_bot()
+            end
+        end,
+        [bot_actions.ENUM.CONSUME_ENERGY] = function()
+            current_cell:feed_bot()
+        end,
+        [bot_actions.ENUM.CONSUME_BOT] = function()
+            ---@type integer
+            local energy = observed_cell:kill_bot()
 
-    elseif bot_action == bot_actions.ENUM.CONSUME_ENERGY then
-        current_cell:feed_bot()
-
-    elseif bot_action == bot_actions.ENUM.CONSUME_BOT then
-        ---@type integer
-        local energy = observed_cell:kill_bot()
-
-        if current_cell:has_bot() then
-            current_cell:feed_bot(energy)
-            observed_cell:accept_bot(current_cell:get_bot())
-            current_cell:kill_bot()
-        end
-
-    elseif bot_action == bot_actions.ENUM.MULTIPLY then
-        if current_cell:get_bot_energy() <= 10 then
-            current_cell:kill_bot()
-        else
-            child_bot = current_cell:get_child()
-        end
+            if current_cell:has_bot() then
+                current_cell:feed_bot(energy)
+                observed_cell:accept_bot(current_cell:get_bot())
+                current_cell:kill_bot()
+            end
+        end,
+        [bot_actions.ENUM.MULTIPLY] = function ()
+            if current_cell:get_bot_energy() <= 10 then
+                current_cell:kill_bot()
+            else
+                child_bot = current_cell:get_child()
+            end
+        end,
+    }
+    
+    if bot_action then
+        action_table[bot_action]()
     end
 
     return current_cell, observed_cell, child_bot
@@ -194,15 +204,15 @@ end
 ---@return integer[] action_data
 ---@nodiscard
 function field:get_iteration(result)
-    self:update_energy()
 
-    --[[
-    ---@type field
-    local result = field.new_default(self)
-    ]]--
+    self:update_energy()
 
     ---@type integer[]
     local action_data = {}
+
+    for _ = 1, bot_actions.ACTION_SIZE do
+        table.insert(action_data, 0)
+    end
 
     for i = 1, self._height do
         for j = 1, self._width do
@@ -217,26 +227,23 @@ function field:get_iteration(result)
                 local d_y, d_x = current_cell:get_bot_pov()
 
                 ---@type integer
-                local dir_y = get_shifted(i, d_y, self._height)
+                local direction_y = get_shifted(i, d_y, self._height)
 
                 ---@type integer
-                local dir_x = get_shifted(j, d_x, self._width)
+                local direction_x = get_shifted(j, d_x, self._width)
 
                 assert(self._grid[i])
+                assert(self._grid[direction_y], direction_y .. " " .. direction_x)
 
-                assert(self._grid[dir_y], dir_y .. " " .. dir_x)
                 ---@type cell
-                local observed_cell = self._grid[dir_y][dir_x]
+                local observed_cell = self._grid[direction_y][direction_x]
 
                 ---@type BOT_ACTION?
                 local bot_action = current_cell:get_action(observed_cell)
 
-                if bot_action then
-                    if action_data[bot_action] then
-                        action_data[bot_action] = action_data[bot_action] + 1
-                    else
-                        table.insert(action_data, bot_action, 1)
-                    end
+                if bot_action ~= nil then
+                    assert(action_data[bot_action] ~= nil, "action_data, " .. bot_action)
+                    action_data[bot_action] = action_data[bot_action] + 1
                 end
 
                 ---@type bot?
@@ -253,7 +260,7 @@ function field:get_iteration(result)
                         :accept_bot(child_bot)
                 end
 
-                result._grid[dir_y][dir_x] = observed_cell
+                result._grid[direction_y][direction_x] = observed_cell
                 result._grid[i][j] = current_cell
             end
         end
@@ -270,16 +277,17 @@ end
 ---@return string[]
 ---@nodiscard
 function field:to_print()
+
     ---@type string[]
     local result = {}
 
-    for _, value in ipairs(self._grid) do
+    for _, row in ipairs(self._grid) do
 
         ---@type string[]
         local res_table = {}
 
-        for i, box in ipairs(value) do
-                res_table[i] = box:has_bot() and "@" or " "
+        for i, box in ipairs(row) do
+                res_table[i] = box:has_bot() and string.char(box:get_bot()._gene) or " "
         end
 
         result[#result + 1] = table.concat(res_table)

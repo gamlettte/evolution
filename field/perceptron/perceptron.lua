@@ -118,18 +118,41 @@ function perceptron.new_deep_copy(other)
 end
 
 
----@public
-function perceptron:mutate()
-    ---@type integer
-    local total_value_count = 0
-    for i = 1, (#self._layer_structure_data) - 1 do
-        total_value_count = total_value_count +
-                            self._layer_structure_data[i]
-                                * self._layer_structure_data[i + 1]
-    end
+
+---@private
+---@param layer_number integer
+---@return integer -- total layer weight count
+---@nodiscard
+function perceptron:get_layer_weight_count(layer_number)
+    assert(layer_number > 0 and layer_number < #self._layer_structure_data)
+
+    return self._layer_structure_data[layer_number] 
+        * self._layer_structure_data[layer_number]
+end
+
+
+---@private
+---@return integer -- total perceptron weight count
+---@nodiscard
+function perceptron:get_total_weight_count()
 
     ---@type integer
-    local mutation_index = math.random(total_value_count)
+    local total_weight_count = 0
+    for i = 1, (#self._layer_structure_data) - 1 do
+        total_weight_count = total_weight_count +
+            self:get_layer_weight_count(i)
+
+    end
+
+    return total_weight_count
+end
+
+
+---@public
+function perceptron:mutate()
+
+    ---@type integer
+    local mutation_index = math.random(self:get_total_weight_count())
 
     -- locate layer
     ---@type integer
@@ -140,7 +163,7 @@ function perceptron:mutate()
 
     for i = 1, (#self._layer_structure_data) - 1 do
         ---@type integer
-        local layer_size = self._layer_structure_data[i] * self._layer_structure_data[i + 1]
+        local layer_size = self:get_layer_weight_count(i)
         if mutation_index <= total_layer_values + layer_size then
             mutated_layer_index = i
             break
@@ -164,12 +187,10 @@ function perceptron:mutate()
     ---@type integer
     local mutated_weight_index = mutated_layer_index % neuron_size
 
-    ---@type number
-    local mutated_weight_value = mutated_neuron[mutated_weight_index]
-
     local xavier_coef = 1 / math.sqrt(neuron_size)
     mutated_neuron[mutated_weight_index] = (math.random() * 2 - 1) * xavier_coef
 end
+
 
 ---@public
 ---@param input number[]

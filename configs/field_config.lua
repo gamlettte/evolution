@@ -1,0 +1,8 @@
+---@type integer
+local CONST_INITIAL_PLACEMENT_PROMILE = 100
+
+local config = {
+    CONST_INITIAL_PLACEMENT_PROMILE = CONST_INITIAL_PLACEMENT_PROMILE,
+}
+
+return config

@@ -1,7 +1,9 @@
 local field = require("field.field")
+
 ---@class field_manager
 ---@field private _field_arr field[]
 ---@field private _is_first_field_used boolean
+---@field private _iteration_counter integer
 local field_manager = {}
 field_manager.__index = field_manager
 
@@ -13,9 +15,12 @@ field_manager.__index = field_manager
 ---@return field_manager
 ---@nodiscard
 function field_manager.new(height, width, population)
-    assert(height > 0)
-    assert(width > 0)
-    assert(population > 0 and population <= 1000)
+    assert(type(height) == 'number', "Error: height must be a number.")
+    assert(type(width) == 'number', "Error: width must be a number.")
+    assert(type(population) == 'number', "Error: population must be a number.")
+    assert(height > 0, "Error: height must be greater than zero.")
+    assert(width > 0, "Error: width must be greater than zero.")
+    assert(population > 0 and population <= 1000, "Error: population must be between 1 and 1000 (inclusive).")
 
     ---@type field[]
     local field_arr = {}
@@ -27,6 +32,7 @@ function field_manager.new(height, width, population)
     local self = setmetatable({
         _field_arr = field_arr,
         _is_first_field_used = true,
+        _iteration_counter = 0,
     }
     ,field_manager)
 
@@ -41,18 +47,39 @@ function field_manager:get_iteration()
     ---@type boolean
     local is_first_field_used = self._is_first_field_used
 
-    ---@type integer[][]
-    local return_data = {}
+    ---@type integer[]
+    local return_data = nil
     if is_first_field_used then
         return_data = self._field_arr[1]:get_iteration(self._field_arr[2])
     else
         return_data = self._field_arr[2]:get_iteration(self._field_arr[1])
     end
 
+    assert(return_data, "return_data is "..type(return_data))
+
     self._is_first_field_used = not is_first_field_used
+
+    self._iteration_counter = self._iteration_counter + 1
 
     return return_data
 end
+
+
+---@public
+---@return integer
+---@nodiscard
+function field_manager:get_iteration_count()
+    return self._iteration_counter
+end
+
+
+---@public
+---@return integer, integer y, x
+---@nodiscard
+function field_manager:get_field_sizes()
+    return self._field_arr[1]._height, self._field_arr[1]._width -- TODO add getter
+end
+
 
 ---@public
 ---@return string[]

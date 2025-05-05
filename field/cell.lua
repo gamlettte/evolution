@@ -1,5 +1,8 @@
+---@module "field.bot"
 local bot = require("field.bot")
-local bot_actions = require("field.bot_actions")
+
+---@module "configs.cell_config"
+local cell_config = require("configs.cell_config")
 
 ---@class cell
 ---@field private _bot_place bot?
@@ -15,7 +18,7 @@ function cell.new(is_bot)
     ---@type cell
     local self = setmetatable({
         _bot_place = is_bot and bot.new() or nil,
-        _energy = math.random(3)
+        _energy = math.random(cell_config.CONST_INITIAL_CELL_ENERGY)
     }, cell)
     return self
 end
@@ -83,7 +86,9 @@ end
 ---@param new_energy integer
 ---@return nil
 function cell:add_energy(new_energy)
-    self._energy = self._energy + new_energy
+    self._energy = math.min(
+        self._energy + new_energy,
+        cell_config.CONST_MAX_CELL_ENERGY)
 end
 
 

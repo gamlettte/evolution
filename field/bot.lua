@@ -1,11 +1,14 @@
+---@module "field.bot_actions"
 local bot_actions = require("field.bot_actions")
 
+---@module "field.perceptron.perceptron"
 local perceptron = require("field.perceptron.perceptron")
+
+---@module "field.perceptron.activation_functions"
 local activation_functions = require("field.perceptron.activation_functions")
 
-
-_G.bot_brain_count = 0
-local const_brain_structure = {5, 5, 5}
+---@module "configs.bot_config"
+local bot_config = require("configs.bot_config")
 
 ---@class bot
 ---@field private _brain perceptron
@@ -16,21 +19,6 @@ local const_brain_structure = {5, 5, 5}
 ---@field private _life_counter integer
 local bot = {}
 bot.__index = bot
-
----@type integer
-local CONST_WEIGHT_DEVIATION = 10
-
----@type integer
-local CONST_BRAIN_MUTATION_SPAWN_PROB = 5
-
----@type integer
-local CONST_BRAIN_MUTATION_ACTION_PROB = 10
-
----@type integer
-local CONST_MAX_BOT_AGE = 200
-
----@type integer
-local CONST_MAX_GENE_VALUE = 94
 
 
 ---@public
@@ -43,18 +31,28 @@ function bot:get_child()
         _direction_y = math.random(-1, 1),
         _direction_x = math.random(-1, 1),
         _brain = self._brain:new_deep_copy(),
-        _energy = math.random(3) + 15,
+        _energy = math.random(
+            bot_config.CONST_INITIAL_MIN_ENERGY,
+            bot_config.CONST_INITIAL_MAX_ENERGY),
         _gene = self._gene,
         _life_counter = 0
     }, bot)
 
-    self._energy = self._energy - 11
+    self._energy = self._energy - bot_config.CONST_MULTIPLY_COST
 
-    if math.random(15) == 1 then
-        child._gene = child._gene + math.random(-1, 1)
+    if math.random(bot_config.CONST_GENE_MUTATION_SPAWN_PROB) == 1 then
+        local new_gene = child._gene + math.random(-1, 1)
+        if new_gene > bot_config.CONST_MAX_GENE_VALUE then
+            new_gene = bot_config.CONST_MIN_GENE_VALUE
+        end
+
+        if new_gene < bot_config.CONST_MIN_GENE_VALUE then
+            new_gene = bot_config.CONST_MAX_GENE_VALUE
+        end
+        child._gene = new_gene
     end
 
-    if math.random(CONST_BRAIN_MUTATION_SPAWN_PROB) == 1 then
+    if math.random(bot_config.CONST_BRAIN_MUTATION_SPAWN_PROB) == 1 then
         child._brain:mutate()
     end
 
@@ -68,15 +66,21 @@ end
 function bot.new()
 
     ---@type integer
-    local gene = math.random(CONST_MAX_GENE_VALUE)
+    local gene = math.random(
+        bot_config.CONST_MIN_GENE_VALUE,
+        bot_config.CONST_MAX_GENE_VALUE)
 
     ---@type bot
     local self = setmetatable({
         _direction_y = math.random(-1, 1),
         _direction_x = math.random(-1, 1),
-        _brain = perceptron.new(const_brain_structure, activation_functions.ENUM.RE_LU.FUNCTION,
-                                                 activation_functions.ENUM.RE_LU.DERIVATIVE),
-        _energy = math.random(3) + 5,
+        _brain = perceptron.new(
+            bot_config.CONST_BRAIN_STRUCTURE,
+            activation_functions.ENUM.RE_LU.FUNCTION,
+            activation_functions.ENUM.RE_LU.DERIVATIVE),
+        _energy = math.random(
+            bot_config.CONST_INITIAL_MIN_ENERGY,
+            bot_config.CONST_INITIAL_MAX_ENERGY),
         _gene = gene,
         _life_counter = 0
     }, bot)
@@ -96,18 +100,20 @@ end
 ---@param input_vector integer[]
 ---@return BOT_ACTION
 ---@nodiscard
-function bot:brain_response(input_vector)
-    local r2 = self._brain:run(input_vector)
+function bot:parse_brain_response(input_vector)
 
-    ---@type integer[]
+    ---@type number[]
+    local response_array = self._brain:run(input_vector)
+
+    ---@type number[]
     local direction_vector = {}
-    table.insert(direction_vector, table.remove(r2, #r2))
-    table.insert(direction_vector, table.remove(r2, #r2))
+    table.insert(direction_vector, table.remove(response_array, #response_array))
+    table.insert(direction_vector, table.remove(response_array, #response_array))
 
     for index, value in ipairs(direction_vector) do
-        if value < 0.25 and value > 0 then
+        if value < 0.4 and value > 0 then
             direction_vector[index] = -1
-        elseif value < 0.75 then
+        elseif value < 0.6 then
             direction_vector[index] = 0
         else
             direction_vector[index] = 1
@@ -121,18 +127,18 @@ function bot:brain_response(input_vector)
     local max_ind = -1
 
     ---@type number
-    local max_val = 0.0
+    local max_val = -math.huge
 
-    assert(#r2 == bot_actions.ACTION_SIZE - 1, "r2 = "..#r2.." bas = "..bot_actions.ACTION_SIZE)
+    assert(#response_array == bot_actions.ACTION_SIZE - 1,
+        "r2 = "..#response_array.." bas = "..bot_actions.ACTION_SIZE)
 
-    for index, value in ipairs(r2) do
-        -- assert(value >= 0 and value <= 1, "value = " .. value)
+    for index, value in ipairs(response_array) do
         if max_val < value then
             max_ind = index
             max_val = value
         end
     end
-    assert(max_ind <= bot_actions.ACTION_SIZE,
+    assert(max_ind <= bot_actions.ACTION_SIZE and max_ind > 0,
            "mi = " .. max_ind .. " bs = " .. bot_actions.ACTION_SIZE)
 
     return max_ind + 1 --[[@as BOT_ACTION]]
@@ -144,11 +150,11 @@ end
 ---@return BOT_ACTION?
 ---@nodiscard
 function bot:get_action(observed_cell)
-    if self._life_counter == CONST_MAX_BOT_AGE then
+    if self._life_counter == bot_config.CONST_MAX_BOT_AGE then
         return nil
     end
 
-    if math.random(CONST_BRAIN_MUTATION_ACTION_PROB) then
+    if math.random(bot_config.CONST_BRAIN_MUTATION_ACTION_PROB) then
         self._brain:mutate()
     end
 
@@ -168,21 +174,14 @@ function bot:get_action(observed_cell)
     table.insert(input_data, self._direction_x)
     table.insert(input_data, self._direction_y)
     table.insert(input_data, observed_cell_has_bot)
-    table.insert(input_data, math.min(observed_cell:get_energy() / 10, 1))
+    table.insert(input_data, math.min(observed_cell:get_energy() / 5, 1))
 
-    do
-        ---@type number
-        local max = -math.huge
-        for _, value in ipairs(input_data) do
-            if value > max then
-                max = value
-            end
-        end
-        assert(max <= 1.0, "max = "..max)
+    for index, value in ipairs(input_data) do
+        assert(value <= 1.0, "input_data[" .. index .."] = " .. value)
     end
 
     ---@type BOT_ACTION
-    return self:brain_response(input_data)
+    return self:parse_brain_response(input_data)
 end
 
 
