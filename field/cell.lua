@@ -144,4 +144,12 @@ function cell:get_energy()
 end
 
 
+---@public
+function cell:update_energy()
+    if self._energy < cell_config.CONST_MIN_CELL_ENERGY then
+        self:add_energy(cell_config.CONST_MAX_ENERGY_UPDATE)
+    end
+end
+
+
 return cell

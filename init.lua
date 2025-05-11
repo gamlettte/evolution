@@ -1,3 +1,6 @@
+---@module "socket"
+local socket = require "socket"
+
 ---@module "field.field"
 local field = require("field.field")
 
@@ -69,6 +72,9 @@ local function update_screen(a_stdscr, a_field_manager, a_CONST_VISUALIZATION_MO
         a_stdscr:mvaddstr(y_field_size + 1, 0,
                         " iterations = " .. iteration_counter)
         a_stdscr:refresh()
+
+        socket.sleep(tui_config.CONST_FRAME_PERIOD)
+
     elseif iteration_counter % tui_config.CONST_LOG_PRINTOUT_THRESHOLD == 0 then
         ---@type number
         local percent_done = iteration_counter 
@@ -93,8 +99,8 @@ local CONST_VISUALIZATION_MODE = parsed_arguments.visualize or
                                 tui_config.CONST_VISUALIZATION_MODE
 
 math.randomseed( 
-    0
-    -- os.clock()
+    -- 0
+    os.clock()
 )
 
 ---@type stdscr
@@ -109,12 +115,15 @@ local y_screen_size = curses.lines()
 local x_screen_size = curses.cols()
 
 ---@type integer
-local y_field_size = y_screen_size - 3
+local y_field_size = 100 -- y_screen_size - 3
 
 ---@type integer
-local x_field_size = x_screen_size - 3
+local x_field_size = 190 -- x_screen_size - 5
 
-while true do
+---@type integer
+local epoch_counter = 0
+while epoch_counter < 1000 do
+    epoch_counter = epoch_counter + 1
     ---@type field_manager
     local my_field_manager = field_manager.new(
         y_field_size,
@@ -133,9 +142,11 @@ while true do
 
         update_screen(stdscr, my_field_manager, CONST_VISUALIZATION_MODE)
 
-        if my_field_manager:count_bots() == 0 then
-            print("FAILED!!!\r")
+        if my_field_manager:count_bots() < 10 then
+            print(epoch_counter .. "FAILED!!!\r")
             break
         end
     end
 end
+
+print("FINFISHED!!")

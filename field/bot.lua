@@ -10,6 +10,10 @@ local activation_functions = require("field.perceptron.activation_functions")
 ---@module "configs.bot_config"
 local bot_config = require("configs.bot_config")
 
+---@module "field.bot_rotation"
+local rotation = require("field.bot_rotation")
+
+
 ---@class bot
 ---@field private _brain perceptron
 ---@field private _direction_x integer
@@ -17,6 +21,7 @@ local bot_config = require("configs.bot_config")
 ---@field private _energy integer
 ---@field private _gene integer
 ---@field private _life_counter integer
+---@field private _action integer
 local bot = {}
 bot.__index = bot
 
@@ -35,7 +40,8 @@ function bot:get_child()
             bot_config.CONST_INITIAL_MIN_ENERGY,
             bot_config.CONST_INITIAL_MAX_ENERGY),
         _gene = self._gene,
-        _life_counter = 0
+        _life_counter = 0,
+        _action = 0,
     }, bot)
 
     self._energy = self._energy - bot_config.CONST_MULTIPLY_COST
@@ -82,7 +88,8 @@ function bot.new()
             bot_config.CONST_INITIAL_MIN_ENERGY,
             bot_config.CONST_INITIAL_MAX_ENERGY),
         _gene = gene,
-        _life_counter = 0
+        _life_counter = 0,
+        _action = 0,
     }, bot)
 
     return self
@@ -96,6 +103,15 @@ function bot:get_pov()
     return self._direction_y, self._direction_x
 end
 
+
+---@public
+---@return integer
+---@nodiscard
+function bot:get_action_data()
+    return self._action
+end
+
+
 ---@private
 ---@param input_vector integer[]
 ---@return BOT_ACTION
@@ -105,32 +121,42 @@ function bot:parse_brain_response(input_vector)
     ---@type number[]
     local response_array = self._brain:run(input_vector)
 
-    ---@type number[]
-    local direction_vector = {}
-    table.insert(direction_vector, table.remove(response_array, #response_array))
-    table.insert(direction_vector, table.remove(response_array, #response_array))
+    ---@type number
+    local temp_x = self._direction_x
 
-    for index, value in ipairs(direction_vector) do
-        if value < 0.4 and value > 0 then
-            direction_vector[index] = -1
-        elseif value < 0.6 then
-            direction_vector[index] = 0
-        else
-            direction_vector[index] = 1
-        end
+    ---@type number
+    local temp_y = self._direction_y
+
+    ---@type number
+    local to_reverse = table.remove(response_array, #response_array)
+    if to_reverse > 0.5 then
+        temp_x, temp_y = rotation.reverse(temp_x, temp_y)
     end
 
-    self._direction_y = direction_vector[1]
-    self._direction_x = direction_vector[2]
+    ---@type number
+    local to_rotate_90 = table.remove(response_array, #response_array)
+    if to_rotate_90 > 0.5 then
+        temp_x, temp_y = rotation.rotate_90(temp_x, temp_y)
+    end
+
+    ---@type number
+    local to_rotate_45 = table.remove(response_array, #response_array)
+    if to_rotate_45 > 0.5 then
+        temp_x, temp_y = rotation.rotate_45(temp_x, temp_y)
+    end
+
+    self._direction_y = temp_x
+    self._direction_x = temp_y
+
+
+    assert(#response_array == bot_actions.ACTION_SIZE,
+        "r2 = "..#response_array.." bas = "..bot_actions.ACTION_SIZE)
 
     ---@type integer
     local max_ind = -1
 
     ---@type number
     local max_val = -math.huge
-
-    assert(#response_array == bot_actions.ACTION_SIZE - 1,
-        "r2 = "..#response_array.." bas = "..bot_actions.ACTION_SIZE)
 
     for index, value in ipairs(response_array) do
         if max_val < value then
@@ -141,7 +167,9 @@ function bot:parse_brain_response(input_vector)
     assert(max_ind <= bot_actions.ACTION_SIZE and max_ind > 0,
            "mi = " .. max_ind .. " bs = " .. bot_actions.ACTION_SIZE)
 
-    return max_ind + 1 --[[@as BOT_ACTION]]
+    self._action = max_ind
+
+    return self._action --[[@as BOT_ACTION]]
 end
 
 
@@ -171,10 +199,13 @@ function bot:get_action(observed_cell)
                                   and 1 or 0
 
     table.insert(input_data, math.min(self._energy / 30, 1))
+
     table.insert(input_data, self._direction_x)
     table.insert(input_data, self._direction_y)
+    table.insert(input_data, math.min(self._life_counter / bot_config.CONST_MAX_BOT_AGE, 1))
+
     table.insert(input_data, observed_cell_has_bot)
-    table.insert(input_data, math.min(observed_cell:get_energy() / 5, 1))
+    table.insert(input_data, math.min(observed_cell:get_energy() / 10, 1))
 
     for index, value in ipairs(input_data) do
         assert(value <= 1.0, "input_data[" .. index .."] = " .. value)
@@ -190,6 +221,14 @@ end
 ---@return nil
 function bot:add_energy(new_energy)
     self._energy = self._energy + new_energy
+end
+
+
+---@public
+---@param energy integer
+---@return nil
+function bot:subtract_energy(energy)
+    self._energy = math.max(0, self._energy - energy)
 end
 
 

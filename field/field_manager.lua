@@ -93,6 +93,7 @@ function field_manager:to_print()
     end
 end
 
+
 ---@public
 ---@return integer
 ---@nodiscard
@@ -102,6 +103,19 @@ function field_manager:count_bots()
         return self._field_arr[1]:count_bots()
     else
         return self._field_arr[2]:count_bots()
+    end
+end
+
+
+---@public
+---@return (integer?)[][]
+---@nodiscard
+function field_manager:get_action_data_matrix()
+
+    if  self._is_first_field_used then
+        return self._field_arr[1]:get_action_data_matrix()
+    else
+        return self._field_arr[2]:get_action_data_matrix()
     end
 end
 

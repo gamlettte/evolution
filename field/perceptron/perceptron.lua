@@ -126,8 +126,8 @@ end
 function perceptron:get_layer_weight_count(layer_number)
     assert(layer_number > 0 and layer_number < #self._layer_structure_data)
 
-    return self._layer_structure_data[layer_number] 
-        * self._layer_structure_data[layer_number]
+    return self._layer_structure_data[layer_number]
+        * self._layer_structure_data[layer_number + 1]
 end
 
 
@@ -174,11 +174,12 @@ function perceptron:mutate()
     assert(mutated_layer_index)
 
     mutation_index = mutation_index - total_layer_values
+    assert(mutation_index <= self:get_layer_weight_count(mutated_layer_index))
 
     ---@type integer
     local neuron_size = #(self._weight_layers[mutated_layer_index][1])
     ---@type integer
-    local mutated_neuron_index = math.ceil(mutated_layer_index / neuron_size)
+    local mutated_neuron_index = math.ceil(mutation_index / neuron_size)
 
     ---@type number[]
     local mutated_neuron = self._weight_layers[mutated_layer_index][mutated_neuron_index]
@@ -211,10 +212,7 @@ function perceptron:run(input)
     end
 
     ---@type number[]
-    local line = {}
-    for _, value in ipairs(input) do
-        line[#line + 1] = value
-    end
+    local line = input
 
     ---@type number[]
     for _, weight_layer in ipairs(self._weight_layers) do
@@ -243,6 +241,7 @@ function perceptron:run(input)
 end
 
 
+--[[
 ---@private
 ---@param input number[]
 ---@return number[][]
@@ -438,7 +437,6 @@ end
 
 
 
---[[
 ---@public
 ---@param file_path string
 ---@param activation_f fun(input_value: number): number

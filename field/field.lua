@@ -1,5 +1,6 @@
 local cell = require("field.cell")
 local bot_actions = require("field.bot_actions")
+local bot_config = require("configs.bot_config")
 
 ---@class field
 ---@field private _height integer
@@ -135,9 +136,7 @@ end
 function field:update_energy()
     for i = 1, self._height do
         for j = 1, self._width do
-            if self._grid[i][j]:get_energy() < 11 then
-                self._grid[i][j]:add_energy(3)
-            end
+            self._grid[i][j]:update_energy()
         end
     end
 end
@@ -155,6 +154,7 @@ function field.process_cells(current_cell, bot_action, observed_cell)
     local action_table = {
         [bot_actions.ENUM.MOVE] = function()
             if not observed_cell:has_bot() then
+                current_cell:get_bot():subtract_energy(2)
                 observed_cell:accept_bot(current_cell:get_bot())
                 current_cell:kill_bot()
             end
@@ -163,6 +163,14 @@ function field.process_cells(current_cell, bot_action, observed_cell)
             current_cell:feed_bot()
         end,
         [bot_actions.ENUM.CONSUME_BOT] = function()
+            if not observed_cell:has_bot() then
+                if math.random(200) == 1 then
+                    current_cell:kill_bot()
+                end
+
+                return
+            end
+
             ---@type integer
             local energy = observed_cell:kill_bot()
 
@@ -173,14 +181,16 @@ function field.process_cells(current_cell, bot_action, observed_cell)
             end
         end,
         [bot_actions.ENUM.MULTIPLY] = function ()
-            if current_cell:get_bot_energy() <= 10 then
+            if
+                current_cell:get_bot_energy() <= bot_config.CONST_MULTIPLY_COST
+            then
                 current_cell:kill_bot()
             else
                 child_bot = current_cell:get_child()
             end
         end,
     }
-    
+
     if bot_action then
         action_table[bot_action]()
     end
@@ -195,9 +205,21 @@ end
 ---@param max integer
 ---@return integer
 ---@nodiscard
+local function get_bordered(position, shift, max)
+    return math.max(1, math.min(position - shift, max))
+end
+
+
+---@private
+---@param position integer
+---@param shift integer
+---@param max integer
+---@return integer
+---@nodiscard
 local function get_shifted(position, shift, max)
     return (position - shift + max - 1) % max + 1
 end
+
 
 ---@public
 ---@param result field
@@ -230,7 +252,7 @@ function field:get_iteration(result)
                 local direction_y = get_shifted(i, d_y, self._height)
 
                 ---@type integer
-                local direction_x = get_shifted(j, d_x, self._width)
+                local direction_x = get_bordered(j, d_x, self._width)
 
                 assert(self._grid[i])
                 assert(self._grid[direction_y], direction_y .. " " .. direction_x)
@@ -256,7 +278,7 @@ function field:get_iteration(result)
                                                 observed_cell)
                 if child_bot then
                     result._grid[get_shifted(i, math.random(-1, 1), self._height)]
-                                [get_shifted(j, math.random(-1, 1), self._width)]
+                                [get_bordered(j, math.random(-1, 1), self._width)]
                         :accept_bot(child_bot)
                 end
 
@@ -264,6 +286,7 @@ function field:get_iteration(result)
                 result._grid[i][j] = current_cell
             end
         end
+        -- collectgarbage("collect")
     end
 
     assert(result._grid[1] ~= nil)
@@ -281,19 +304,61 @@ function field:to_print()
     ---@type string[]
     local result = {}
 
+    ---@type table
+    local match = {
+        [1] = "1",
+        [2] = "#",
+        [3] = "'",
+        [4] = "&"
+    }
+
     for _, row in ipairs(self._grid) do
 
         ---@type string[]
         local res_table = {}
 
         for i, box in ipairs(row) do
-                res_table[i] = box:has_bot() and string.char(box:get_bot()._gene) or " "
+            local action = nil
+            if box:has_bot() then
+                action = box:get_bot():get_action_data()
+            end
+            res_table[i] = action and match[action] or " "
         end
 
         result[#result + 1] = table.concat(res_table)
     end
 
     return result
+end
+
+
+---@public
+---@return (integer?)[][]
+---@nodiscard
+function field:get_action_data_matrix()
+
+    ---@type (integer?)[][]
+    local result_matrix = {}
+
+    for _, row in ipairs(self._grid) do
+
+        ---@type (integer?)[]
+        local result_row = {}
+
+        for _, box in ipairs(row) do
+            if box:has_bot() then
+                table.insert(result_row, box:get_bot():get_action_data())
+            else
+                table.insert(result_row, 0)
+            end
+        end
+
+        table.insert(result_matrix, result_row)
+    end
+
+    assert(#result_matrix == self._height)
+    assert(#result_matrix[1] == self._width, "rmw "..#result_matrix[1].." sw "..self._width)
+    return result_matrix
 end
 
 
